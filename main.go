@@ -10,23 +10,21 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
-type logrusWriter struct {
-	logger *logrus.Logger
-}
+var Modules = []fx.Option{
+	fx.WithLogger(func(logger *logrus.Logger) fxevent.Logger {
+		return &fxevent.ConsoleLogger{
+			W: logger.WithField("component", "fx").Writer(),
+		}
+	}),
 
-func (w logrusWriter) Write(p []byte) (n int, err error) {
-	w.logger.Info(string(p))
-	return len(p), nil
+	config.Module,
+	//weather.Module,
+	handler.Module,
+	server.Module,
 }
 
 func main() {
-	fx.New(
-		config.Module,
-		//weather.Module,
-		handler.Module,
-		server.Module,
-		fx.WithLogger(func(log *logrus.Logger) fxevent.Logger {
-			return &fxevent.ConsoleLogger{W: &logrusWriter{logger: log}}
-		}),
-	).Run()
+	app := fx.New(Modules...)
+	app.Run()
+	<-app.Done()
 }

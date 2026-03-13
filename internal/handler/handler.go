@@ -2,22 +2,29 @@ package handler
 
 import (
 	"encoding/json"
+	"myweather/internal/config"
+	"myweather/internal/model"
 	"net/http"
 	"time"
 
-	"myweather/internal/model"
+	"github.com/sirupsen/logrus"
 )
 
 type Handler struct {
 	// Add any dependencies here, e.g. services, loggers, etc.
+	cfg *config.Config
+	log *logrus.Logger
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(cfg *config.Config, log *logrus.Logger) *Handler {
+	return &Handler{
+		cfg: cfg,
+		log: log,
+	}
 }
 
 func (h *Handler) ListCities(w http.ResponseWriter, r *http.Request) {
-	// Implement logic to list cities
+	writeJSON(w, http.StatusOK, h.cfg.Cities)
 }
 
 func (h *Handler) GetCityWeather(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +36,6 @@ func (h *Handler) CollectWeatherData(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	// Implement health check logic
 	writeJSON(w, http.StatusOK, model.HealthResponse{
 		Status:    "ok",
 		Timestamp: time.Now().UTC(),
