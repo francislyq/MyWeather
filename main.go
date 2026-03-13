@@ -4,6 +4,7 @@ import (
 	"myweather/internal/config"
 	"myweather/internal/handler"
 	"myweather/internal/server"
+	"myweather/internal/weather"
 
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
@@ -18,7 +19,7 @@ var Modules = []fx.Option{
 	}),
 
 	config.Module,
-	//weather.Module,
+	weather.Module,
 	handler.Module,
 	server.Module,
 }

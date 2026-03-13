@@ -4,22 +4,27 @@ import (
 	"encoding/json"
 	"myweather/internal/config"
 	"myweather/internal/model"
+	"myweather/internal/weather"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type Handler struct {
-	// Add any dependencies here, e.g. services, loggers, etc.
 	cfg *config.Config
 	log *logrus.Logger
+
+	weatherService *weather.Service
 }
 
-func NewHandler(cfg *config.Config, log *logrus.Logger) *Handler {
+func NewHandler(cfg *config.Config, log *logrus.Logger, weatherService *weather.Service) *Handler {
 	return &Handler{
-		cfg: cfg,
-		log: log,
+		cfg:            cfg,
+		log:            log,
+		weatherService: weatherService,
 	}
 }
 
@@ -28,7 +33,55 @@ func (h *Handler) ListCities(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetCityWeather(w http.ResponseWriter, r *http.Request) {
-	// Implement logic to get weather for a specific city
+	vars := mux.Vars(r)
+	cityIDStr, ok := vars["id"]
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, model.ErrorResponse{
+			Error: "id is required",
+			Code:  http.StatusBadRequest,
+		})
+		return
+	}
+
+	cityID, err := strconv.Atoi(cityIDStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, model.ErrorResponse{
+			Error: "Invalid city_id",
+			Code:  http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Check if city exists in config
+	cityExists := false
+	for _, city := range h.cfg.Cities {
+		if city.ID == cityID {
+			cityExists = true
+			break
+		}
+	}
+
+	if !cityExists {
+		writeJSON(w, http.StatusNotFound, model.ErrorResponse{
+			Error: "City not found in the configuration cities list",
+			Code:  http.StatusNotFound,
+		})
+		return
+	}
+
+	results, err := h.weatherService.GetWeather(r.Context(), cityID)
+	if err != nil {
+		h.log.Errorf("Failed to get weather for city %d: %v", cityID, err)
+		writeJSON(w, http.StatusInternalServerError, model.ErrorResponse{
+			Error: "Failed to get weather data",
+			Code:  http.StatusInternalServerError,
+		})
+		return
+	}
+
+	// Cache the results (not implemented yet)
+
+	writeJSON(w, http.StatusOK, results)
 }
 
 func (h *Handler) CollectWeatherData(w http.ResponseWriter, r *http.Request) {
