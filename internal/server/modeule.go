@@ -6,7 +6,7 @@ import (
 
 var Module = fx.Module(
 	"server",
-	fx.Provide(
+	fx.Invoke(
 		New,
 	),
 )

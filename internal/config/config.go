@@ -21,7 +21,7 @@ func New(log *logrus.Logger) *Config {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:        getEnvAsInt("SERVER_PORT", 8080),
+		Port:        getEnvAsInt("SERVER_PORT", 3000),
 		APIKey:      getEnvStr("WEATHER_API_KEY", ""),
 		HTTPTimeout: getEnvDuration("HTTP_TIMEOUT", 10*time.Second),
 		Cities: []model.City{

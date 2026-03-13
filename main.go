@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 type logrusWriter struct {
@@ -24,6 +25,8 @@ func main() {
 		//weather.Module,
 		handler.Module,
 		server.Module,
-		fx.WithLogger(logrus.New().WithField("component", "fx").Writer()),
+		fx.WithLogger(func(log *logrus.Logger) fxevent.Logger {
+			return &fxevent.ConsoleLogger{W: &logrusWriter{logger: log}}
+		}),
 	).Run()
 }

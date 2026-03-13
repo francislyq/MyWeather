@@ -1,6 +1,12 @@
 package handler
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"myweather/internal/model"
+)
 
 type Handler struct {
 	// Add any dependencies here, e.g. services, loggers, etc.
@@ -24,6 +30,10 @@ func (h *Handler) CollectWeatherData(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	// Implement health check logic
+	writeJSON(w, http.StatusOK, model.HealthResponse{
+		Status:    "ok",
+		Timestamp: time.Now().UTC(),
+	})
 }
 
 func (h *Handler) GetCacheStats(w http.ResponseWriter, r *http.Request) {
@@ -32,4 +42,10 @@ func (h *Handler) GetCacheStats(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ClearCache(w http.ResponseWriter, r *http.Request) {
 	// Implement logic to clear cache
+}
+
+func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
