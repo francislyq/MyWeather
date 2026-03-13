@@ -86,6 +86,8 @@ func (h *Handler) GetCityWeather(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CollectWeatherData(w http.ResponseWriter, r *http.Request) {
 	// Implement logic to collect weather data
+	results := h.weatherService.CollectWeatherData(r.Context())
+	writeJSON(w, http.StatusOK, results)
 }
 
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
