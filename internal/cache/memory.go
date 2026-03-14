@@ -45,8 +45,8 @@ func (c *MemoryCache) Get(key string) (*Entry, bool) {
 	c.hits.Add(1)
 	return &Entry{
 		Value:     it.value,
-		FetchedAt: it.fetchedAt.Unix(),
-		ExpiresAt: it.expiresAt.Unix(),
+		FetchedAt: it.fetchedAt,
+		ExpiresAt: it.expiresAt,
 	}, true
 }
 

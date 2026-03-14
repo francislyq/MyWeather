@@ -6,8 +6,8 @@ import (
 
 type Entry struct {
 	Value     interface{}
-	FetchedAt int64
-	ExpiresAt int64
+	FetchedAt time.Time
+	ExpiresAt time.Time
 }
 
 type Stats struct {
