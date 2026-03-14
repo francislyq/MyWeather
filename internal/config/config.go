@@ -11,10 +11,12 @@ import (
 )
 
 type Config struct {
-	Port        int
-	APIKey      string
-	HTTPTimeout time.Duration
-	Cities      []model.City
+	Port            int
+	APIKey          string
+	HTTPTimeout     time.Duration
+	Cities          []model.City
+	CacheTTL        time.Duration
+	CleanupInterval time.Duration
 }
 
 func New(log *logrus.Logger) *Config {
@@ -29,6 +31,8 @@ func New(log *logrus.Logger) *Config {
 			{ID: 6094817, Name: "Ottawa", Country: "CA"},
 			{ID: 1850147, Name: "Tokyo", Country: "JP"},
 		},
+		CacheTTL:        getEnvDuration("CACHE_TTL", 5*time.Minute),
+		CleanupInterval: getEnvDuration("CLEANUP_INTERVAL", 1*time.Minute),
 	}
 
 	if cfg.APIKey == "" {
