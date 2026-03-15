@@ -54,6 +54,7 @@ type HealthResponse struct {
 type WeatherResult struct {
 	Weather   *Weather  `json:"weather,omitempty"`
 	CacheHit  bool      `json:"-"`
+	IsStale   bool      `json:"-"`
 	FetchedAt time.Time `json:"-"`
 	ExpiresAt time.Time `json:"-"`
 }

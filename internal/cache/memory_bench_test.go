@@ -23,7 +23,7 @@ import (
 // 		go func(i int) {
 // 			defer wg.Done()
 // 			key := strconv.Itoa((i % 3) + 1) // Cycle through city IDs
-// 			cache.Set(key, "weather_data", 5*time.Second)
+// 			cache.Set(key, "weather_data", 5*time.Second, 0)
 // 			entry, found := cache.Get(key)
 // 			assert.True(b, found)
 // 			assert.Equal(b, "weather_data", entry.Value)
@@ -40,7 +40,7 @@ func BenchmarkMemoryCacheSet(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := strconv.Itoa(i)
-		cache.Set(key, "weather_data", 5*time.Second)
+		cache.Set(key, "weather_data", 5*time.Second, 0)
 	}
 }
 
@@ -49,7 +49,7 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 	// Pre-populate cache with 1000 entries
 	for i := 0; i < 1000; i++ {
 		key := strconv.Itoa(i)
-		cache.Set(key, "weather_data", 5*time.Second)
+		cache.Set(key, "weather_data", 5*time.Second, 0)
 	}
 
 	b.ResetTimer()
@@ -66,7 +66,7 @@ func BenchmarkMemoryCacheConcurrentAccess(b *testing.B) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(i int) {
 			key := strconv.Itoa(i)
-			cache.Set(key, "weather_data", 5*time.Second)
+			cache.Set(key, "weather_data", 5*time.Second, 0)
 			cache.Get(key)
 		}(i)
 	}
@@ -77,7 +77,7 @@ func BenchmarkMemoryCacheConcurrentAccess(b *testing.B) {
 			if i%2 == 0 {
 				cache.Get("key")
 			} else {
-				cache.Set("key", "value", 5*time.Minute)
+				cache.Set("key", "value", 5*time.Minute, 0)
 			}
 			i++
 		}

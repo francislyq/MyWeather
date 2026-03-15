@@ -41,9 +41,18 @@ func (s *Service) GetWeather(ctx context.Context, cityID int) (*model.WeatherRes
 		if !ok {
 			s.log.Warnf("Cache entry for city %d has invalid type, ignoring", cityID)
 			s.cache.Delete(key)
+		} else if entry.IsStale {
+			s.log.Infof("Stale cache hit for city %d, revalidating in background", cityID)
+			go s.revalidate(cityID)
+			return &model.WeatherResult{
+				Weather:   w,
+				CacheHit:  true,
+				IsStale:   true,
+				FetchedAt: entry.FetchedAt,
+				ExpiresAt: entry.ExpiresAt,
+			}, nil
 		} else {
 			s.log.Infof("Cache hit for city %d", cityID)
-
 			return &model.WeatherResult{
 				Weather:   w,
 				CacheHit:  true,
@@ -63,7 +72,7 @@ func (s *Service) GetWeather(ctx context.Context, cityID int) (*model.WeatherRes
 			return nil, err
 		}
 
-		s.cache.Set(key, w, s.cfg.CacheTTL)
+		s.cache.Set(key, w, s.cfg.CacheTTL, s.cfg.StaleWhileRevalidate)
 		return w, nil
 	})
 
@@ -92,6 +101,21 @@ func (s *Service) GetWeather(ctx context.Context, cityID int) (*model.WeatherRes
 
 	// fetch from provider
 	//return s.provider.FetchWeather(ctx, cityID)
+}
+
+func (s *Service) revalidate(cityID int) {
+	key := strconv.Itoa(cityID)
+	_, _, _ = s.sfGroup.Do("revalidate:"+key, func() (interface{}, error) {
+		s.log.WithField("city_id", cityID).Info("Background revalidation started")
+		w, err := s.provider.FetchWeather(context.Background(), cityID)
+		if err != nil {
+			s.log.Errorf("Background revalidation failed for city %d: %v", cityID, err)
+			return nil, err
+		}
+		s.cache.Set(key, w, s.cfg.CacheTTL, s.cfg.StaleWhileRevalidate)
+		s.log.WithField("city_id", cityID).Info("Background revalidation complete")
+		return w, nil
+	})
 }
 
 func (s *Service) CollectWeatherData(ctx context.Context) []model.CityWeatherResult {

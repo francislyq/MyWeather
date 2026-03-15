@@ -55,8 +55,8 @@ Weather endpoints include cache metadata:
 
 | Header | Description |
 |--------|-------------|
-| `X-Cache` | `HIT` or `MISS` |
-| `X-Cache-TTL-Remaining` | Seconds until this entry expires |
+| `X-Cache` | `HIT`, `STALE`, or `MISS` |
+| `X-Cache-TTL-Remaining` | Seconds until the entry's fresh window expires (0 when stale) |
 | `X-Cache-Fetched-At` | RFC3339 timestamp when data was fetched from the external API |
 
 ## Configuration
@@ -68,8 +68,9 @@ All configuration is via environment variables (loaded from `.env` in developmen
 | `SERVER_PORT` | `3000` | HTTP server port |
 | `WEATHER_API_KEY` | *required* | OpenWeatherMap API key |
 | `HTTP_TIMEOUT` | `10s` | External HTTP client timeout |
-| `CACHE_TTL` | `5m` | Cache entry time-to-live |
+| `CACHE_TTL` | `5m` | Cache entry fresh window (time-to-live before becoming stale) |
 | `CACHE_CLEANUP_INTERVAL` | `1m` | Background expired entry cleanup interval |
+| `CACHE_STALE_WHILE_REVALIDATE` | `1m` | How long a stale entry may be served while a background refresh runs. Set to `0` to disable stale serving and revert to strict TTL behaviour. |
 
 ### GitHub Secrets (for CI/CD)
 
@@ -81,16 +82,43 @@ Store `WEATHER_API_KEY` as a GitHub repository secret. It will be injected as an
 
 The cache is implemented as a standalone package (`internal/cache/`) with a clean interface that could be swapped for Redis or any other backing store.
 
+### Entry Lifecycle
+
+Each cache entry has two deadlines:
+
+```
+ stored          fresh window ends     stale window ends
+   │                    │                     │
+   ▼                    ▼                     ▼
+───●────────────────────●─────────────────────●────▶ time
+   │◄── CACHE_TTL ─────►│◄─ STALE_WHILE_REV ─►│
+        (fresh, HIT)        (stale, STALE)       (expired, MISS)
+```
+
+- **Fresh** (`now < ExpiresAt`): served directly, `X-Cache: HIT`.
+- **Stale** (`ExpiresAt ≤ now < StaleUntil`): stale data returned immediately (`X-Cache: STALE`) while a background goroutine refreshes the cache. The next request will get fresh data.
+- **Expired** (`now ≥ StaleUntil`): entry evicted, treated as a cache miss — the request blocks on an upstream API call.
+
 ### Key Decisions
 
-- **Strict TTL enforcement**: Expired entries are never served. On `Get()`, if the entry is expired, it is deleted and a cache miss is returned.
+- **Stale-while-revalidate**: Stale data is served for up to `CACHE_STALE_WHILE_REVALIDATE` after the TTL expires, while a background goroutine silently refreshes the cache. This eliminates the latency spike that would otherwise hit every first request after a TTL expiry.
+- **Configurable feature flag**: Setting `CACHE_STALE_WHILE_REVALIDATE=0` disables stale serving entirely, restoring strict TTL behaviour for contexts where data freshness is more important than latency consistency.
+- **Background revalidation via singleflight**: The background refresh is wrapped in a `singleflight.Group` (keyed separately from foreground requests). If multiple goroutines detect a stale entry at the same time, only one upstream call is made.
 - **Concurrent safety**: `sync.RWMutex` protects the map — read-lock for gets, write-lock for sets/deletes. Stats use `sync/atomic` counters to avoid lock contention on hot paths.
-- **Stampede prevention**: `singleflight` in the weather service ensures that concurrent requests for the same uncached city result in exactly one external API call. Other goroutines wait and share the result.
-- **Lazy + periodic eviction**: Expired entries are cleaned on access (lazy) and by a background goroutine on a configurable interval (periodic sweep).
+- **Stampede prevention on cold misses**: `singleflight` in the weather service ensures that concurrent requests for the same fully-expired city result in exactly one external API call. Other goroutines wait and share the result.
+- **Periodic eviction**: A background goroutine sweeps the map on `CACHE_CLEANUP_INTERVAL` and removes any entries whose stale window has also expired. Lazy eviction on `Get()` handles the rest.
 
 ### Trade-offs
 
-- **No stale serving**: I chose strict TTL over stale-while-revalidate for simplicity and predictability. The trade-off is that the first request after expiry pays the full latency of an external API call.
+| Concern | Decision | Rationale |
+|---------|----------|-----------|
+| Latency consistency | Serve stale, revalidate in background | Eliminates the "cold cache spike" after every TTL expiry; weather data is tolerant of being seconds or a minute old |
+| Data freshness | Configurable stale window (default 1 m) | Short stale window keeps data reasonably fresh while absorbing TTL boundary latency |
+| Complexity | Added `staleUntil` field and background goroutine | Small increase; the singleflight guard prevents background stampede |
+| Stale data risk | `X-Cache: STALE` header exposed to clients | Callers that require strict freshness can observe the header and decide to wait or retry |
+| Memory | Entries live longer (TTL + stale window) | With 3 cities this is negligible; periodic + lazy eviction bounds growth |
+| Cache-aside correctness | Background revalidation uses `context.Background()` | Foreground request context may cancel before revalidation finishes; a detached context prevents premature cancellation |
+
 - **No LRU/max-size eviction**: With only 3 configured cities, memory is not a concern. The cache interface supports adding eviction policies later.
 - **In-memory only**: Cache is lost on restart. Acceptable for this use case where data is cheap to re-fetch.
 

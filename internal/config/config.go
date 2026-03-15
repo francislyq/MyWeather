@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Port            int
-	APIKey          string
-	HTTPTimeout     time.Duration
-	Cities          []model.City
-	CacheTTL        time.Duration
-	CleanupInterval time.Duration
+	Port                  int
+	APIKey                string
+	HTTPTimeout           time.Duration
+	Cities                []model.City
+	CacheTTL              time.Duration
+	CleanupInterval       time.Duration
+	StaleWhileRevalidate  time.Duration
 }
 
 func New(log *logrus.Logger) *Config {
@@ -31,8 +32,9 @@ func New(log *logrus.Logger) *Config {
 			{ID: 6094817, Name: "Ottawa", Country: "CA"},
 			{ID: 1850147, Name: "Tokyo", Country: "JP"},
 		},
-		CacheTTL:        getEnvDuration("CACHE_TTL", 5*time.Minute),
-		CleanupInterval: getEnvDuration("CLEANUP_INTERVAL", 1*time.Minute),
+		CacheTTL:             getEnvDuration("CACHE_TTL", 5*time.Minute),
+		CleanupInterval:      getEnvDuration("CACHE_CLEANUP_INTERVAL", 1*time.Minute),
+		StaleWhileRevalidate: getEnvDuration("CACHE_STALE_WHILE_REVALIDATE", 0),
 	}
 
 	if cfg.APIKey == "" {
