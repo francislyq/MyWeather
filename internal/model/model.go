@@ -50,3 +50,26 @@ type HealthResponse struct {
 	Status    string    `json:"status"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+type WeatherResult struct {
+	Weather   *Weather  `json:"weather,omitempty"`
+	CacheHit  bool      `json:"-"`
+	FetchedAt time.Time `json:"-"`
+	ExpiresAt time.Time `json:"-"`
+}
+
+type CityWeatherResult struct {
+	CityID    int      `json:"city_id"`
+	CityName  string   `json:"city_name"`
+	Weather   *Weather `json:"weather,omitempty"`
+	Status    string   `json:"status"`
+	Cache     string   `json:"cache"`
+	LatencyMs int64    `json:"latency_ms"`
+	Error     string   `json:"error,omitempty"`
+}
+
+type CacheStatsResponse struct {
+	Hits   int `json:"hits"`
+	Misses int `json:"misses"`
+	Size   int `json:"size"`
+}

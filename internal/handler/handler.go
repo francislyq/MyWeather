@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"myweather/internal/cache"
 	"myweather/internal/config"
 	"myweather/internal/model"
 	"myweather/internal/weather"
@@ -18,13 +20,15 @@ type Handler struct {
 	log *logrus.Logger
 
 	weatherService *weather.Service
+	cache          cache.Cache
 }
 
-func NewHandler(cfg *config.Config, log *logrus.Logger, weatherService *weather.Service) *Handler {
+func NewHandler(cfg *config.Config, log *logrus.Logger, weatherService *weather.Service, c cache.Cache) *Handler {
 	return &Handler{
 		cfg:            cfg,
 		log:            log,
 		weatherService: weatherService,
+		cache:          c,
 	}
 }
 
@@ -79,7 +83,8 @@ func (h *Handler) GetCityWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cache the results (not implemented yet)
+	// Cache the results
+	setCacheHeaders(w, results)
 
 	writeJSON(w, http.StatusOK, results)
 }
@@ -98,15 +103,37 @@ func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetCacheStats(w http.ResponseWriter, r *http.Request) {
-	// Implement logic to get cache statistics
+	stats := h.cache.Stats()
+	writeJSON(w, http.StatusOK, model.CacheStatsResponse{
+		Hits:   int(stats.Hits),
+		Misses: int(stats.Misses),
+		Size:   int(stats.Size),
+	})
 }
 
 func (h *Handler) ClearCache(w http.ResponseWriter, r *http.Request) {
-	// Implement logic to clear cache
+	h.cache.Clear()
+	h.log.Info("Cache flushed")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
+}
+
+func setCacheHeaders(w http.ResponseWriter, result *model.WeatherResult) {
+	if result.CacheHit {
+		w.Header().Set("X-Cache", "HIT")
+	} else {
+		w.Header().Set("X-Cache", "MISS")
+	}
+
+	ttlRemaining := time.Until(result.ExpiresAt).Seconds()
+	if ttlRemaining < 0 {
+		ttlRemaining = 0
+	}
+	w.Header().Set("X-Cache-TTL-Remaining", fmt.Sprintf("%.0f", ttlRemaining))
+	w.Header().Set("X-Cache-Fetched-At", result.FetchedAt.UTC().Format(time.RFC3339))
 }

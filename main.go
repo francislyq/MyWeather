@@ -1,6 +1,7 @@
 package main
 
 import (
+	"myweather/internal/cache"
 	"myweather/internal/config"
 	"myweather/internal/handler"
 	"myweather/internal/server"
@@ -19,6 +20,7 @@ var Modules = []fx.Option{
 	}),
 
 	config.Module,
+	cache.Module,
 	weather.Module,
 	handler.Module,
 	server.Module,
