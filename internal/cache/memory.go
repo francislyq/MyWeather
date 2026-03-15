@@ -26,8 +26,8 @@ func NewMemoryCache() Cache {
 }
 
 func (c *MemoryCache) Get(key string) (*Entry, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	it, found := c.items[key]
 
@@ -36,11 +36,11 @@ func (c *MemoryCache) Get(key string) (*Entry, bool) {
 		return nil, false
 	}
 
-	if time.Now().After(it.expiresAt) {
-		c.misses.Add(1)
-		c.Delete(key)
-		return nil, false
-	}
+	// if time.Now().After(it.expiresAt) {
+	// 	c.misses.Add(1)
+	// 	c.Delete(key)
+	// 	return nil, false
+	// }
 
 	c.hits.Add(1)
 	return &Entry{
