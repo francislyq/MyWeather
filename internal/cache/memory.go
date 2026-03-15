@@ -7,9 +7,10 @@ import (
 )
 
 type item struct {
-	value     interface{}
-	fetchedAt time.Time
-	expiresAt time.Time
+	value      interface{}
+	fetchedAt  time.Time
+	expiresAt  time.Time
+	staleUntil time.Time
 }
 
 type MemoryCache struct {
@@ -36,28 +37,34 @@ func (c *MemoryCache) Get(key string) (*Entry, bool) {
 		return nil, false
 	}
 
-	// if time.Now().After(it.expiresAt) {
-	// 	c.misses.Add(1)
-	// 	c.Delete(key)
-	// 	return nil, false
-	// }
+	now := time.Now()
+
+	// Fully expired — beyond the stale window (or no stale window configured)
+	if now.After(it.staleUntil) {
+		c.misses.Add(1)
+		delete(c.items, key)
+		return nil, false
+	}
 
 	c.hits.Add(1)
 	return &Entry{
 		Value:     it.value,
 		FetchedAt: it.fetchedAt,
 		ExpiresAt: it.expiresAt,
+		IsStale:   now.After(it.expiresAt),
 	}, true
 }
 
-func (c *MemoryCache) Set(key string, value interface{}, ttl time.Duration) {
+func (c *MemoryCache) Set(key string, value interface{}, ttl time.Duration, staleWindow time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	now := time.Now()
 	c.items[key] = &item{
-		value:     value,
-		fetchedAt: time.Now(),
-		expiresAt: time.Now().Add(ttl),
+		value:      value,
+		fetchedAt:  now,
+		expiresAt:  now.Add(ttl),
+		staleUntil: now.Add(ttl + staleWindow),
 	}
 }
 
@@ -105,7 +112,7 @@ func (c *MemoryCache) cleanup() {
 
 	now := time.Now()
 	for key, it := range c.items {
-		if now.After(it.expiresAt) {
+		if now.After(it.staleUntil) {
 			delete(c.items, key)
 		}
 	}

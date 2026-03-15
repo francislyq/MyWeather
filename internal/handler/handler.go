@@ -123,11 +123,16 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	json.NewEncoder(w).Encode(v)
 }
 
+const headerXCache = "X-Cache"
+
 func setCacheHeaders(w http.ResponseWriter, result *model.WeatherResult) {
-	if result.CacheHit {
-		w.Header().Set("X-Cache", "HIT")
-	} else {
-		w.Header().Set("X-Cache", "MISS")
+	switch {
+	case result.CacheHit && result.IsStale:
+		w.Header().Set(headerXCache, "STALE")
+	case result.CacheHit:
+		w.Header().Set(headerXCache, "HIT")
+	default:
+		w.Header().Set(headerXCache, "MISS")
 	}
 
 	ttlRemaining := time.Until(result.ExpiresAt).Seconds()

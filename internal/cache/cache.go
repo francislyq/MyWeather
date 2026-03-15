@@ -5,9 +5,10 @@ import (
 )
 
 type Entry struct {
-	Value     interface{}
-	FetchedAt time.Time
-	ExpiresAt time.Time
+	Value      interface{}
+	FetchedAt  time.Time
+	ExpiresAt  time.Time
+	IsStale    bool
 }
 
 type Stats struct {
@@ -18,7 +19,7 @@ type Stats struct {
 
 type Cache interface {
 	Get(key string) (*Entry, bool)
-	Set(key string, value interface{}, ttl time.Duration)
+	Set(key string, value interface{}, ttl time.Duration, staleWindow time.Duration)
 	Delete(key string)
 	Clear()
 	Stats() Stats
